@@ -1,0 +1,107 @@
+package org.usfirst.frc.team4538.robot;
+
+import edu.wpi.first.wpilibj.Joystick;
+import edu.wpi.first.wpilibj.Preferences;
+import edu.wpi.first.wpilibj.Relay.Value;
+import edu.wpi.first.wpilibj.RobotDrive.MotorType;
+import edu.wpi.first.wpilibj.SampleRobot;
+import edu.wpi.first.wpilibj.SpeedController;
+import edu.wpi.first.wpilibj.Talon;
+import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj.Relay;
+import edu.wpi.first.wpilibj.RobotDrive;
+import edu.wpi.first.wpilibj.DigitalInput;
+import edu.wpi.first.wpilibj.Victor;
+import edu.wpi.first.wpilibj.VictorSP;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+
+public class Robot extends SampleRobot {
+	
+    private SpeedController r_motor;	//The controller for the drive motors on the right side
+    private SpeedController l_motor;	//The controller for the drive motors on the left side
+    private SpeedController grab_motor; //Controls the motor used to grasp boxes
+    private Joystick r_stick;			//Controls left motors
+    private Joystick l_stick;			//Controls right motors
+    private Joystick a_stick;			//Used for controlling accessories
+    private Relay lift_motor;			//Controls the motor used to lift boxes
+    private RobotDrive drive;			//Controls the drive train as a whole
+    private DigitalInput limit_bot;		//Controls a limit switch to limit the lift at the bottom
+    private DigitalInput limit_top;		//Controls a limit switch to limit the lift at the top
+    private DigitalInput limit_out;		//Controls a limit switch to limit the grasping mechanism
+    private Preferences prefs;
+
+	private final double k_updatePeriod = 0.005; // update every 0.005 seconds/5 milliseconds (200Hz)
+
+    public Robot() {
+        r_motor = new Talon(0);						//Initialize the motor as a Talon on PWM channel 0
+        l_motor = new Talon(1);						//Initialize the motor as a Talon on PWM channel 1
+        grab_motor = new Victor(2);					//Initialize the motor as a Victor on PWM channel 2
+        r_stick = new Joystick(0);					//Initialize the joystick connected on USB slot 0
+        l_stick = new Joystick(1);					//Initialize the joystick connected on USB slot 1
+        a_stick = new Joystick(2); 					//Initialize the joystick connected on USB slot 2
+        lift_motor = new Relay(1);					//Initialize the relay on relay channel 1
+        limit_bot = new DigitalInput(0);			//Initialize the switch on DIO channel 0
+        limit_top = new DigitalInput(1);			//Initialize the switch on DIO channel 1
+        limit_out = new DigitalInput(2);			//Initialize the switch on DIO channel 2
+       
+        drive = new RobotDrive(r_motor, l_motor);			//Set the drive train to be controlled by the left and right motors
+        drive.setInvertedMotor(MotorType.kRearLeft, true);	//Set the left drive motors to be inverted
+    }
+    
+    protected void execute()
+    {
+    	//Previous Dashboard location ""C:\\Program Files\\FRC Dashboard\\Dashboard.exe""
+    	SmartDashboard.putBoolean("Bot Switch", limit_bot.get());
+    	SmartDashboard.putBoolean("Top Switch", limit_top.get());
+    	SmartDashboard.putBoolean("Out Switch", limit_out.get());
+    }
+    
+    public void autonomous() {
+    	if(isAutonomous() && isEnabled()) {
+    		drive.setSafetyEnabled(false);					//Turn safety off so the motors do not stop
+    		//Autonomous Code here
+    	}
+    }
+    
+    public void operatorControl() {
+    	drive.setSafetyEnabled(true);		//Turn safety on, which makes sure motors turn off if we lose communication
+		drive.setExpiration(.1);			//Motors turn off if communication is not received for 100 ms
+		
+        while (isOperatorControl() && isEnabled()) {
+        	
+        	execute();
+        	
+        	drive.tankDrive(r_stick, l_stick);		//Moving using tank drive, where the left joystick controls the left drive motors
+        											//and the right joystick controls the right drive motors
+        	
+        	/**
+        	 *Controls for lifting the boxes
+        	 */
+        	if(a_stick.getRawButton(5) && limit_top.get())			//If button 5 is pressed on a_stick and it is not limited to move up
+        	{
+        		lift_motor.set(Relay.Value.kForward);				//Move the lift up
+        	}
+        	else if(a_stick.getRawButton(3) && limit_bot.get())		//If button 3 is pressed on a_stick and it is not limited to move down
+        	{
+        		lift_motor.set(Relay.Value.kReverse);				//Move the lift down
+        	}
+        	else lift_motor.set(Relay.Value.kOff);					//Otherwise, do not move the lift
+        	
+        	/**
+        	 * Controls for grabbing the boxes
+        	 */
+        	if(a_stick.getRawButton(6) == true && limit_out.get())	//If button 6 is pressed on a_stick and it is not limited to move outwards
+        	{
+        		grab_motor.set(.1);									//Extend arms outward
+        	}
+        	else if(a_stick.getRawButton(4) == true)				//If button 4 is pressed on a_stick
+        	{
+        		grab_motor.set(-.1);								//Close arms together
+        	}
+        	else grab_motor.set(0);									//Otherwise, do not move the arms
+        	
+            Timer.delay(k_updatePeriod);	// wait 5ms to the next update
+        }
+        
+    }
+}
